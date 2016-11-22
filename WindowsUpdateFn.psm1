@@ -1,51 +1,33 @@
-function Enable-WUA
-{
-    [CmdletBinding()]
-    param
-    (
-        [Parameter(ValueFromPipeline, ValueFromPipelineByPropertyName, Position = 0)]
-        [System.Management.Automation.Runspaces.PSSession]
-        $Session
-    )
-    Process
-    {
+# Get public and private function definition files.
+$Public  = @(Get-ChildItem -Path $PSScriptRoot\Public\*.ps1 -ErrorAction SilentlyContinue)
+$Private = @(Get-ChildItem -Path $PSScriptRoot\Private\*.ps1 -ErrorAction SilentlyContinue)
 
-    }    
+# Dot source the files
+foreach ($file in @($Public + $Private))
+{
+	Try
+	{
+		. $file.fullname
+	}
+	Catch
+	{
+		Write-Error -Message "Failed to import function $($file.FullName): $_"
+	}
 }
 
-function Test-IsAdmin
+# Get private .cs files.
+$Private = @(Get-ChildItem -Path $PSScriptRoot\Private\*.cs -ErrorAction SilentlyContinue)
+
+foreach ($file in $Private) 
 {
-    ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+	Try
+	{
+		Add-Type -Path $file.FullName
+	}
+	Catch
+	{
+		Write-Error -Message "Failed to import .cs file $($file.FullName): $_"
+	}
 }
 
-function New-ErrorRecord
-{
-    [CmdletBinding(DefaultParameterSetName = 'ErrorMessageSet')]
-    param
-    (
-        [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Position = 0, ParameterSetName = 'ErrorMessageSet')]
-        [String]$ErrorMessage,
-
-        [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Position = 0, ParameterSetName = 'ExceptionSet')]
-        [System.Exception]$Exception,
-
-        [Parameter(ValueFromPipelineByPropertyName = $true, Position = 1)]
-        [System.Management.Automation.ErrorCategory]$ErrorCategory = [System.Management.Automation.ErrorCategory]::NotSpecified,
-
-        [Parameter(ValueFromPipelineByPropertyName = $true, Position = 2)]
-        [String]$ErrorId,
-
-        [Parameter(ValueFromPipelineByPropertyName = $true, Position = 3)]
-        [Object]$TargetObject
-    )
-    
-    Process
-    {
-        if (!$Exception)
-        {
-            $Exception = New-Object System.Exception $ErrorMessage
-        }
-    
-        New-Object System.Management.Automation.ErrorRecord $Exception, $ErrorId, $ErrorCategory, $TargetObject
-    }
-}
+Export-ModuleMember -Function $Public.Basename
